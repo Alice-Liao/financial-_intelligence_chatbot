@@ -1,96 +1,133 @@
-# 📈 Financial Intelligence Chatbot (RAG System)
+# 📈 FinSight — Financial Intelligence Chatbot (RAG System)
 
-A full-stack financial AI assistant that retrieves real-time market data (Stocks, Crypto, ETFs) from a local vector database and generates professional insights using a local LLM.
+> A RAG-powered financial Q&A assistant that grounds LLM responses in **11,862 real financial documents**, delivering source-cited answers with **69% higher accuracy** than a standalone LLM baseline.
 
-**Architecture:** Streamlit (Frontend) → FastAPI (Backend) → ChromaDB (Vector Store) + Ollama (LLM)
+**Stack:** Streamlit · FastAPI · ChromaDB · Llama 3.2 (3B) · Sentence Transformers · Ollama · Docker
+
+---
+
+## 🏆 Key Results
+
+| Metric | RAG System (Ours) | Baseline Llama 3 | Improvement |
+|--------|:-----------------:|:----------------:|:-----------:|
+| Overall Score (23 questions) | **7.6 / 10** | 4.5 / 10 | +69% |
+| Time-sensitive queries (Q1) | **8.5 / 10** | 2.25 / 10 | +278% |
+
+> On earnings-specific queries, the baseline LLM completely failed (score: 2.25) by outputting knowledge-cutoff refusals. Our RAG system retrieved live data and answered accurately (score: 8.5).
+
+---
+
+## 🧠 Architecture
+
+```
+User Query
+    │
+    ▼
+[Sentence Transformers]        ← all-MiniLM-L6-v2 (384-dim embeddings)
+    │  encode query
+    ▼
+[ChromaDB Vector Store]        ← HNSW index, cosine similarity ANN search
+    │  top-4 docs retrieved
+    ▼
+[Context Injection]            ← COSTR prompt engineering framework
+    │  grounding prompt
+    ▼
+[Llama 3.2 3B via Ollama]      ← local inference, no fine-tuning
+    │
+    ▼
+Answer + Source Citations
+```
+
+---
+
+## 📊 Dataset
+
+| Source | Entries | Collection Method |
+|--------|--------:|-------------------|
+| Reddit (r/stocks, r/investing, r/CryptoCurrency) | 7,479 | Public JSON API |
+| Yahoo Finance RSS (300+ tickers) | 4,383 | feedparser |
+| **Total** | **11,862** | |
+
+**Quality filters applied:** min 100 chars · min 5 upvotes · max 2,000 chars  
+**Coverage:** Stocks (AAPL, MSFT, NVDA, TSLA) · Crypto (BTC, ETH) · ETFs (SPY, QQQ, VOO)
 
 ---
 
 ## 🚀 Features
 
-- **Interactive UI:** Specific chat interface built with Streamlit.
-- **RAG Technology:** Retrieval-Augmented Generation using `all-MiniLM-L6-v2`.
-- **Local LLM:** Runs offline using **Llama 3.2** (optimized for speed and low memory).
-- **FastAPI Backend:** Robust API handling retrieval and generation logic.
-- **Source Citations:** AI answers include specific references to source documents with relevance scores.
+- **RAG Pipeline** — decouples knowledge base from LLM weights; real-time updates without retraining
+- **Semantic Search** — HNSW-indexed vector store with sub-second cosine similarity retrieval
+- **Hallucination Reduction** — strict grounding prompt ensures answers are sourced from retrieved docs only
+- **Source Citations** — every answer includes document references with relevance scores
+- **Edge AI** — runs fully offline on consumer hardware; no API costs, full data privacy
+- **FastAPI Backend** — REST API with `/query` endpoint; testable via Swagger at `/docs`
 
 ---
 
-## 🛠️ Prerequisites
+## 🛠️ Quick Start
 
-1.  **Python 3.8+**
-2.  **Ollama**:
-    - Download: [ollama.com](https://ollama.com)
-    - **Important:** Pull the lightweight model to prevent crashes:
-      ```bash
-      ollama pull llama3.2:3b
-      ```
-
----
-
-## 📦 Installation
-
-1.  **Clone the repository** (or navigate to your project folder).
-
-2.  **Install Dependencies:**
-
-    ```bash
-    pip install fastapi uvicorn chromadb sentence-transformers ollama pydantic streamlit requests
-    ```
-
-3.  **Check Directory Structure:**
-    Ensure your project folder looks like this:
-    ```text
-    project_root/
-    ├── chroma_db/           # 📂 Folder containing .sqlite3 and .bin files
-    ├── main.py              # ⚙️ Backend (FastAPI)
-    ├── app.py               # 🎨 Frontend (Streamlit)
-    └── README.md
-    ```
-
----
-
-## 🏃‍♂️ How to Run (Step-by-Step)
-
-You need 3 terminal windows to run the full system.
-
-### Step 1: Start AI Engine (Terminal 1)
-
-Ensure Ollama is running in the background.
+### Prerequisites
+- Python 3.8+
+- [Ollama](https://ollama.com) installed
 
 ```bash
+ollama pull llama3.2:3b
+```
+
+### Installation
+
+```bash
+git clone https://github.com/Alice-Liao/financial-intelligence-chatbot
+cd financial-intelligence-chatbot
+pip install fastapi uvicorn chromadb sentence-transformers ollama pydantic streamlit requests
+```
+
+### Run (3 terminals)
+
+```bash
+# Terminal 1 — LLM engine
 ollama serve
 
-Step 2: Start Backend API (Terminal 2)
-This handles the logic and database connection.
-
-Bash
-
+# Terminal 2 — Backend API (wait for "Uvicorn running on http://0.0.0.0:8000")
 python main.py
-Wait until you see: "Uvicorn running on http://0.0.0.0:8000"
 
-Step 3: Start Frontend UI (Terminal 3)
-This launches the chat interface in your browser.
-
-Bash
-
+# Terminal 3 — Frontend UI (opens at http://localhost:8501)
 streamlit run app.py
-The browser should open automatically at: http://localhost:8501
-
-🧪 API Usage (Optional)
-You can also test the backend without the UI using Swagger docs:
-
-URL: http://localhost:8000/docs
-
-Endpoint: POST /query
-
-Sample Payload:
-
-JSON
-
-{
-  "question": "What is the news about Apple?",
-  "n_results": 4,
-  "model": "llama3.2:3b"
-}
 ```
+
+### API Usage
+
+```bash
+curl -X POST http://localhost:8000/query \
+  -H "Content-Type: application/json" \
+  -d '{"question": "What are the latest earnings surprises?", "n_results": 4, "model": "llama3.2:3b"}'
+```
+
+Or use Swagger UI: `http://localhost:8000/docs`
+
+---
+
+## 📁 Project Structure
+
+```
+financial-intelligence-chatbot/
+├── chroma_db/           # Persisted vector store (.sqlite3 + .bin)
+├── data_collector/      # Reddit + Yahoo Finance scrapers
+├── main.py              # FastAPI backend
+├── app.py               # Streamlit frontend
+├── Dockerfile
+├── entrypoint.sh
+└── requirements.txt
+```
+
+---
+
+## 👥 Team
+
+Built by a team of 4 for Northeastern University CS 6120 (NLP), Dec 2025.  
+Contributors: Xinmeng Wu · Yuxin Hu · Muqing Cao · **Danyan (Alice) Liao**
+
+---
+
+## 📄 License
+MIT
